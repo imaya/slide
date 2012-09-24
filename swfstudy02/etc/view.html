@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>lossless2 decode test</title>
+  <script>
+    /*
+    window.Uint8Array = void 0;
+    window.Blob = void 0;
+    //*/
+  </script>
+  <script src="https://raw.github.com/imaya/zlib.js/develop/bin/inflate.min.js"></script>
+  <script src="lossless.js"></script>
+  <script src="data.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      var colormapped = byteStringToByteArray(window.atob(Lossless2DataColormapped));
+      var direct      = byteStringToByteArray(window.atob(Lossless2DataDirect));
+      var start;
+      var end;
+
+      // Direct - canvas
+      start = Date.now ? Date.now() : +new Date();
+      var canvas = decodeLossless2Canvas(direct);
+      end = Date.now ? Date.now() : +new Date();
+      document.getElementById('canvas-direct').appendChild(canvas);
+      document.getElementById('canvas-direct-time').textContent = (end - start) + 'ms';
+
+      // Direct - image
+      start = Date.now ? Date.now() : +new Date();
+      var image = decodeLossless2Image(direct);
+      end = Date.now ? Date.now() : +new Date();
+      document.getElementById('image-direct').appendChild(image);
+      document.getElementById('image-direct-time').textContent = (end - start) + 'ms';
+      document.getElementById('image-direct-type').textContent = image.src.slice(0, 4);
+
+      // Colormapped - canvas
+      start = Date.now ? Date.now() : +new Date();
+      var canvas = decodeLossless2Canvas(colormapped);
+      end = Date.now ? Date.now() : +new Date();
+      document.getElementById('canvas-colormapped').appendChild(canvas);
+      document.getElementById('canvas-colormapped-time').textContent = (end - start) + 'ms';
+
+      // Colormapped - image
+      start = Date.now ? Date.now() : +new Date();
+      var image = decodeLossless2Image(colormapped);
+      end = Date.now ? Date.now() : +new Date();
+      document.getElementById('image-colormapped').appendChild(image);
+      document.getElementById('image-colormapped-time').textContent = (end - start) + 'ms';
+      document.getElementById('image-colormapped-type').textContent = image.src.slice(0, 4);
+    }, false);
+
+    function byteStringToByteArray(byteString) {
+      var array = [];
+      var i;
+      var il;
+
+      for (i = 0, il = byteString.length; i < il; ++i) {
+        array[i] = byteString.charCodeAt(i) & 0xff;
+      }
+
+      return window.Uint8Array !== void 0 ? new Uint8Array(array) : array;
+    }
+  </script>
+</head>
+<body>
+
+<table>
+  <thead>
+  <tr>
+    <th colspan="2">Direct</th>
+    <th colspan="2">Colormapped</th>
+  </tr>
+  <tr>
+    <th>Canvas</th>
+    <th>Image</th>
+    <th>Canvas</th>
+    <th>Image</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+    <td id="canvas-direct"></td>
+    <td id="image-direct"></td>
+    <td id="canvas-colormapped"></td>
+    <td id="image-colormapped"></td>
+  </tr>
+  <tr>
+    <td id="canvas-direct-time" style="text-align: right;"></td>
+    <td id="image-direct-time" style="text-align: right;"></td>
+    <td id="canvas-colormapped-time" style="text-align: right;"></td>
+    <td id="image-colormapped-time" style="text-align: right;"></td>
+  </tr>
+  <tr>
+    <td id="canvas-direct-type" style="text-align: right;"></td>
+    <td id="image-direct-type" style="text-align: right;"></td>
+    <td id="canvas-colormapped-type" style="text-align: right;"></td>
+    <td id="image-colormapped-type" style="text-align: right;"></td>
+  </tr>
+  </tbody>
+</table>
+
+<div id="log"></div>
+
+</body>
+</html>
