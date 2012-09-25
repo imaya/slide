@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+
+<!--
+  Google HTML5 slide template
+
+  Authors: Luke Mahé (code)
+           Marcin Wichary (code and design)
+           
+           Dominic Mazzoni (browser compatibility)
+           Charles Chen (ChromeVox support)
+
+  URL: http://code.google.com/p/html5slides/
+-->
+
+<html>
+  <head>
+    <title>JavaScript による Lossless 画像の扱い方</title>
+
+    <meta charset='utf-8'>
+    <script src='../slides.js'></script>
+  </head>
+  
+  <body style='display: none'>
+
+    <section class='slides layout-regular template-imaya'>
+      
+      <!-- Your slides (<article>s) go here. Delete or comment out the
+           slides below. -->
+
+      <article class="title nobackground">
+        <h1 class="title">JavaScript による<br/>Lossless 画像の扱い方</h1>
+
+        <ul class="author">
+          <li>今屋 雄太</li>
+          <li>Twitter: <a href="http://twitter.com/y_imaya">@y_imaya</a></li>
+          <li>GitHub: <a href="https://github.com/imaya">imaya</a></li>
+        </ul>
+      </article>
+
+      <article>
+          <h2>準備</h2>
+      </article>
+
+      <article class="smaller">
+        <h3>WebブラウザでSWF内の画像を表示したい</h3>
+
+        <p>SWF内の画像形式は以下の通り</p>
+
+        <ul>
+          <li>DefineBitsJpeg</li>
+          <li>DefineBitsJpeg2</li>
+          <li>DefineBitsJpeg3</li>
+          <li>DefineBitsJpeg4</li>
+          <li><strong><strong>DefineBitsLossless</strong></strong></li>
+          <li><strong><strong>DefineBitsLossless2</strong></strong></li>
+        </ul>
+
+        <p>JPEG 系はほとんど JPEG あるいは既存のファイルフォーマットの埋め込みなので若干手を加えるだけ</p>
+        <p>Lossless をどうやって表示させるか</p>
+      </article>
+
+      <article>
+        <h3>Lossless 基礎知識</h3>
+
+        <ul>
+          <li>ピクセル単位の色情報の集合</li>
+          <li>ZLIB(RFC1950)形式で圧縮</li>
+          <li>アルファチャンネル対応(DefineBitsLossless2)</li>
+          <li>カラーマップ（パレット）対応</li>
+        </ul>
+
+        <p>画像フォーマットの情報的にはパレット含めて PNG と相互変換可能</p>
+      </article>
+
+      <article>
+        <h2>PNG への変換</h2>
+      </article>
+
+      <article>
+        <h3>PNG への変換</h3>
+
+        <p>大きく分けると以下の3つの段階に分けられる</p>
+
+        <ul>
+          <li>ZLIBの展開で Lossless 生データを取り出す</li>
+          <li>どのピクセルにどの色が割り当てられているか調べる</li>
+          <li>PNGの生成</li>
+        </ul>
+
+        <p>PNGへの変換特有の処理は生成部分だけ</p>
+      </article>
+
+      <article class="smaller">
+        <h3>生データの取り出し</h3>
+
+        <p>ZLIBの展開が出来れば何でも良いが <a href="https://github.com/imaya/zlib.js">zlib.js</a> というライブラリで例を示す</p>
+
+        <section><pre> // deflated: ZLIB 圧縮された ByteArray or Uint8Array
+var inflator = new Zlib.Inflate(deflated);
+// 展開
+var plain = inflator.decompress();</pre></section>
+
+        <p>実際にはもう少しきちんと使う事で性能が向上する(後述)</p>
+
+        <ul class="note compact">
+          <li><strong>JavaScript で扱う際のメモ</strong>:
+           <ul style="margin-bottom: 0; font-size: smaller;">
+             <li>zlib.js は Typed Array が使用可能なときは入力が自動的に Uint8Array に変換され出力も Uint8Array になる</li>
+             <li>Zlib を扱うライブラリの速度比較: <a href="http://blog.livedoor.jp/imaya_js/archives/5841859.html">JavaScript で書かれた ZLIB の伸張速度比較 : document</a></li>
+           </ul>
+          </li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>ピクセルごとのデータ取得</h3>
+
+        <p>基本的な仕様については省略</p>
+        <p>SWF内のColormappedとDirect画像とPNGのColourTypeの対応は以下の通り</p>
+
+        <table>
+          <thead>
+          <tr>
+            <th>SWF</th>
+            <th>PNG</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr>
+            <td>Colormapped</td>
+            <td>Indexed-colour</td>
+          </tr>
+          <tr>
+            <td>Direct(PIX15, PIX24)</td>
+            <td>TrueColour, TrueColour with alpha</td>
+          </tr>
+          </tbody>
+        </table>
+
+        <ul class="note">
+          <li><strong>Lossless形式をデコードする際の注意</strong>:
+            <ul style="margin-bottom: 0;">
+              <li>Colormapped は1行あたり 4Byte 単位になるようにパディングされる</li>
+              <li>Lossless2 のときは RGB がそれぞれ alpha との乗算になっている(premultipied alpha)</li>
+            </ul>
+          </li>
+        </ul>
+
+      </article>
+
+      <article>
+        <h3>PNG の生成 - 最小構成</h3>
+
+        <p>PNG は Signature + Chunk の集まり</p>
+
+        <ul>
+          <li>Signature: 識別子</li>
+          <li>IHDR: 画像の解像度や形式などの指定</li>
+          <li>PLTE: パレットの色情報。RGB24で最大256個まで(*1)</li>
+          <li>tRNS: パレットのアルファチャンネル指定(*2)</li>
+          <li>IDAT: 画像データ</li>
+          <li>IEND: 終端(空チャンク)</li>
+        </ul>
+
+        <ul class="note">
+          <li>*1: Colormapped のときだけ</li>
+          <li>*2: Colormapped かつ Lossless2 のときだけ</li>
+        </ul>
+      </article>
+
+      <article>
+        <h3>PNG の生成 - パレット変換</h3>
+
+        <ul>
+          <li>lossless: RGB -> PLTE チャンクにそのまま変換可能</li>
+          <li>lossless2: RGBA -> PLTE(RGB) と tRNS(A) に分離させる
+            <ul>
+              <li>Red, Green, Blue は premultiplied alpha
+                <ul>
+                  <li>Red   * 255 / Alpha</li>
+                  <li>Green * 255 / Alpha</li>
+                  <li>Blue  * 255 / Alpha</li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </article>
+
+      <article>
+        <h3>PNG の生成 - IDAT の圧縮</h3>
+
+        <p>無圧縮にする</p>
+
+        <ul>
+          <li>PNG の IDAT チャンクは ZLIB 圧縮</li>
+          <li>ZLIB には無圧縮モードもある</li>
+          <li>ZLIB の圧縮アルゴリズム(LZSS+ハフマン符号)は伸張に比べて圧縮の方が圧倒的に重い</li>
+        </ul>
+
+        <ul class="note">
+          <li>PNG は Scanline の先頭に Filter の指定が入る</li>
+          <li>無圧縮 PNG では指定してもメリットがないので 0 固定</li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>PNG の生成 - 無圧縮 ZLIB の作り方</h3>
+
+        <ul class="compact">
+          <li>Header: 無圧縮固定なので決めうちしてしまう
+            <ul>
+              <li><code>0x78</code>: CINFO: 0x7, CMF: 0x8</li>
+              <li><code>0x01</code>: FDICT, FLEVEL: 0x0, FCHECK: 0x1</li>
+            </ul>
+          </li>
+          <li>Block: 複数になることもある
+            <ul>
+              <li>Block Header: 最後のブロック以外は <code>0x00</code>, 最後だけ <code>0x01</code></li>
+              <li>LEN: 長さ <code>0x0000-0xFFFF</code></li>
+              <li>NLEN: LENの補数</li>
+              <li>data: コピーするだけ</li>
+            </ul>
+          </li>
+          <li>Adler-32: 計算する</li>
+        </ul>
+
+        <ul class="note">
+          <li>
+            Adler-32 の算出ではマジックナンバー 5550 を用いたパフォーマンスチューニングが有名だが、
+            数値が IEEE754 で扱われる JavaScript では 5550 という数値には意味がない
+          </li>
+        </ul>
+      </article>
+
+      <!---------------------------------------------------------------------->
+
+      <article>
+        <h2>JavaScript 的な話</h2>
+      </article>
+
+      <article class="smaller">
+        <h3>Canvas vs PNG 生成</h3>
+
+        <p>Webブラウザで動的に画像を描画して表示するには2種類の方法がある</p>
+
+        <ul>
+          <li><strong>Canvas</strong>
+          <ol style="margin-top: 0.5em;">
+            <li>Canvas にはピクセル単位の操作を行うAPIがある</li>
+            <li>ImageData の data プロパティ <small>(CanvasPixelArray -> Uint8ClampedArray)</small> で操作</li>
+            <li>Lossless からピクセル単位の色情報を読み PixelArray に書き込む</li>
+            <li>CanvasRenderingContext2D#putImageData で Canvas に描画</li>
+          </ol>
+          </li>
+          <li><strong>Image</strong>
+          <ol style="margin-top: 0.5em;">
+            <li>BMP, PNG, GIF などのバイナリを string や Array などで作成</li>
+            <li>作成したデータを base64 エンコードして Data URL, Object URL を作成</li>
+            <li>img 要素の src 属性に入れることで表示</li>
+          </ol>
+          </li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>Canvas vs PNG 生成</h3>
+
+        <ul>
+          <li>Canvas の方がほとんどの場合速い</li>
+          <li>Android Browser ではアルファチャンネルの扱いに Bug がある</li>
+        </ul>
+
+        <img src="images/android-bug-direct.png" style="float: left;"/>
+        <img src="images/android-bug-colormapped.png"/>
+        <br style="clear: both;"/>
+
+        <ul class="note">
+          <li>
+            <a href="http://code.google.com/p/android/issues/detail?id=27615">
+              Android Native Browser Bug - HTML5 canvas image manipulation Alpha Channel
+            </a>
+          </li>
+          <li>
+            Android 4.0 でも再現。Android Chrome や他のブラウザでは再現しない。
+          </li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>Canvas, PNG 生成実行デモ</h3>
+
+        <iframe src="./etc/view.html" style="height: 400px"></iframe>
+
+        <ul class="note">
+          <li>iframe で実際に Lossless2 形式の ByteArray から Canvas 描画 or PNG 生成しています</li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>Canvas vs PNG 生成 Direct ベンチマーク </h3>
+
+        <h4><a href="http://jsperf.com/decode-lossless2-direct">decode lossless2 direct - jsPerf</a></h4>
+
+        <iframe src="http://imaya.github.com/jsperfview/embed.html?id=agt1YS1wcm9maWxlcnINCxIEVGVzdBjQzJcSDA&filter=MOBILE" style="height: 340px"></iframe>
+
+        <ul class="note">
+          <li>Direct はきちんと表示されるならば Canvas 一択</li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>Canvas vs PNG 生成 Colormapped ベンチマーク </h3>
+
+        <h4><a href="http://jsperf.com/decode-lossless2-colormapped">decode lossless2 colormapped - jsPerf</a></h4>
+
+        <iframe src="http://imaya.github.com/jsperfview/embed.html?id=agt1YS1wcm9maWxlcnINCxIEVGVzdBiAiZYSDA&filter=MOBILE" style="height: 340px"></iframe>
+
+        <ul class="note">
+          <li>Colormapped は TypedArray や Blob が使える環境では速い</li>
+          <li>PNG 生成ではパレットを変換してしまえば画像本体は行単位のコピーで変換できるので速い</li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>Array vs Uint8Array</h3>
+
+        <h4><a href="http://jsperf.com/array-vs-typedarray">array vs typedarray - jsPerf</a></h4>
+
+        <iframe src="http://imaya.github.com/jsperfview/embed.html?id=agt1YS1wcm9maWxlcnINCxIEVGVzdBiBlJwSDA&filter=MOBILE" style="height: 340px;"></iframe>
+
+        <ul class="note">
+          <li>iOS5 までの safari の Typed Array は Array と同等以下</li>
+          <li>Android では 4.0 以降で使用可能な Typed Array は圧倒的に速いので使えるなら使うべき</li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>Typed Array を使う場合は事前に必要サイズを把握する</h3>
+
+        <ul>
+          <li>可変ではないため拡張が必要になると新しいバッファを確保しコピーする必要がある</li>
+          <li>例えば pdf.js の ZLIB 展開はバッファサイズを倍々で増やし毎回コピーしている</li>
+        </ul>
+
+        <section><pre>
+ensureBuffer: function DecodeStream_ensureBuffer(requested) {
+  var buffer = this.buffer;
+  var current = buffer ? buffer.byteLength : 0;
+  if (requested < current)
+    return buffer;
+  var size = 512;
+  while (size < requested)
+    size <<= 1;
+  var buffer2 = new Uint8Array(size);
+  for (var i = 0; i < current; ++i)
+    buffer2[i] = buffer[i];
+  return (this.buffer = buffer2);
+}, </pre></section>
+
+        <ul class="note">
+          <li><strong>Lossless ZLIB 展開</strong>: Width, Height, Format から展開後のサイズが計算可能</li>
+          <li><strong>PNG生成</strong>: 無圧縮PNGならば事前に必要なサイズが計算可能</li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>Arrayを使う場合は初期化のサイズは 64K まで (V8)</h3>
+
+        <ul>
+          <li>Android 2.x では Typed Array が使えない</li>
+          <li>V8では初期化時に大きく取りすぎると逆に性能が落ちる</li>
+        </ul>
+
+        <img class='centered' height="250" src='images/typedarray.png'>
+
+        <ul class="note">
+          <li>参考: <a href="http://caniuse.com/#search=typedarray">When can I use... Support tables for HTML5, CSS3, etc</a></li>
+        </ul>
+
+        <p>特定の環境に特化するなら気にしないで良いこともある</p>
+
+      </article>
+
+      <article>
+        <h2>Lossless 形式の ZLIB 展開</h2>
+      </article>
+
+      <article class="smaller">
+        <h3>Lossless 形式の ZLIB 展開時サイズ計算</h3>
+
+        <ul>
+          <li>Colormapped: <code>PaletteSize + BitmapSize</code><br/>
+            <ul>
+              <li>PaletteSize: <code>(BitmapColorTableSize + 1) * (3 or 4)</code></li>
+              <li>Lossless のときは 3, Lossless2 のときは 4</li>
+              <li>BitmapSize: <code>Width * Height</code> ... Width は 4 の倍数に切り上げられる<br/>
+                例: <code>((width + 3) & -4) * height</code></li>
+            </ul></li>
+          <li>Direct: <code>BitmapSize</code><br>
+            <ul>
+              <li>BitmapSize は <code>Width * Height * (2 or 4)</code></li>
+              <li>PIX15 のときは 2, PIX24 のときは 4</li>
+            </ul>
+          </li>
+        </ul>
+
+        <hr style="border: 1px dashed #ddd;"/>
+
+        <p>zlib.js では展開に使用するバッファのサイズを指定することができる</p>
+
+        <section><pre>var plain = new Zlib.Inflate(compressed, {bufferSize: size}).decompress();</pre></section>
+      </article>
+
+      <article>
+        <h2>PNG 生成</h2>
+      </article>
+
+      <article class='smaller'>
+        <h3>無圧縮 PNG のサイズ計算 - PNG 識別子、チャンク共通</h3>
+
+        <ul>
+          <li>Signature: <code>0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a</code> ... 8 Byte</li>
+          <li>各チャンク共通:<br/>
+            <ul>
+              <li>チャンクの長さ: 4 Byte</li>
+              <li>タイプ: 4 Byte</li>
+              <li>データ</li>
+              <li>CRC32: 4 Byte</li>
+            </ul>
+          </li>
+
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>無圧縮 PNG のサイズ計算 - 各チャンク個別</h3>
+        <ul class="compact" style="line-height: 30px;">
+          <li><strong>IHDR</strong>:
+            <ul style="margin-bottom: 10px; line-height: 30px;">
+              <li>Width: 4 Byte</li>
+              <li>Height: 4 Byte</li>
+              <li>BitDepth: 1 Byte</li>
+              <li>ColourType: 1 Byte</li>
+              <li>Compression Method: 1 Byte</li>
+              <li>Filter Method: 1 Byte</li>
+              <li>Interlace Method: 1 Byte</li>
+            </ul>
+          </li>
+          <li><strong>PLTE</strong>: Colormapped のときのみ
+            <ul style="margin-bottom: 10px;">
+              <li> BitmapColorTableSize * 3</li>
+            </ul>
+          </li>
+          <li><strong>tRNS</strong>: Colormapped かつ DefineBitsLossless2 のとき
+            <ul style="margin-bottom: 10px;">
+              <li>BitmapColorTableSize</li>
+            </ul>
+          </li>
+          <li><strong>IDAT</strong>: 後述</li>
+          <li><strong>IEND</strong>: なし</li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>無圧縮 PNG のサイズ計算 - IDAT</h3>
+
+        <ul>
+          <li>ピクセルあたりの必要バイト数
+          <ul>
+            <li>Indexed-colour (Colormapped): 1 ピクセルあたり 1 Byte</li>
+            <li>TrueColour (Lossless Direct): 1 ピクセルあたり 3 Byte</li>
+            <li>TrueColour with alpha (Lossless2 Direct): 1 ピクセルあたり 4 Byte</li>
+          </ul>
+          </li>
+          <li>Scanline の先頭に Filter Byte が必要
+          <ul>
+            <li>Filter Byte は 0 で良い</li>
+          </ul>
+          </li>
+        </ul>
+
+        <ul class="note">
+          <li><strong>要約: <strong style="margin-left: 1em;">(Width * ピクセルあたりバイト数 + 1) * Height</strong></strong></li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>PNG生成 - Object URL 作成</h3>
+
+        <p>BlobBuilder / Blob Constructor / DataURL どれがいい？</p>
+
+        <p>環境ごとに速いものから使う</p>
+
+        <ul style="margin-bottom: 0;">
+          <li>Blob + createObjectURL は速い</li>
+          <li>DataURL は文字列への変換が必要なのでどうしてもコストが大きい</li>
+          <li>DataURL の生成では window.btoa が使える環境では使った方が速い</li>
+        </ul>
+
+        <section><pre style="margin-top: 0; margin-bottom: 0;">var BlobConstructorEnabled = false;
+try { new Blob(); BlobConstructorEnabled = true; } catch(e) {}
+if (BlobConstructorEnabled) {
+  // Blob Constructor
+} else if (window.BlobBuilder || window.WebKitBlobBuilder) {
+  // BlobBuilder
+} else {
+  // Data URL
+}
+</pre></section>
+
+        <ul class="note">
+          <li>参考: <a href="http://blogs.msdn.com/b/ie_ja/archive/2012/07/25/new-blob-constructor-in-ie10.aspx">
+            IE10 における新しい Blob コンストラクター - IEBlog 日本語
+          </a></li>
+        </ul>
+
+      </article>
+
+      <article class="smaller">
+        <h3>ByteArray から ByteString への変換</h3>
+
+        <h4>single</h4>
+        <section><pre>for (i = 0, il = testData.length; i < il; ++i) {
+  tmp[i] = String.fromCharCode(testData[i]);
+}</pre></section>
+
+        <h4>multi</h4>
+        <section><pre>for (i = 0, il = testData.length; i < il; i += size) {
+  tmp[i] = String.fromCharCode.apply(null, testData.slice(i, i + size));
+}</pre></section>
+
+        <ul class="note">
+          <li>Array を使うのが Android 2.x 系だけならば、V8用のチューニングだけでもOK</li>
+          <li>apply の第二引数で渡す配列が大きすぎると RangeError を出す実装もあるので注意</li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>ByteArray から ByteString への変換</h3>
+
+        <h4><a href="http://jsperf.com/bytearray-to-bytestring">bytearray to bytestring - jsPerf</a></h4>
+
+        <iframe src="http://imaya.github.com/jsperfview/embed.html?id=agt1YS1wcm9maWxlcnINCxIEVGVzdBjAm5cSDA&filter=MOBILE" style="height: 340px"></iframe>
+
+        <ul class="note">
+          <li>JavaScript の処理系ごとに最適なコードが異なる</li>
+        </ul>
+      </article>
+
+      <article>
+        <h2 style="right: 0px;">
+          おわり
+        </h2>
+      </article>
+
+      <article class="smaller">
+        <h3>Adler-32</h3>
+
+        <h4><a href="http://jsperf.com/adler-32-simple-vs-optimized/3">adler-32 simple vs optimized - jsPerf</a></h4>
+
+        <iframe src="http://imaya.github.com/jsperfview/embed.html?id=agt1YS1wcm9maWxlcnINCxIEVGVzdBju3JgQDA&filter=MOBILE" style="height: 340px;"></iframe>
+
+        <ul class="note">
+          <li>環境ごとに微妙に優劣があるので、ターゲットごとにこまめにベンチマークを取るのがお勧め</li>
+        </ul>
+      </article>
+
+      <article class="smaller">
+        <h3>おまけ - 参考になりそうなページなど</h3>
+
+        <ul class="compact">
+          <li>仕様
+            <ul>
+              <li><a href="http://www.adobe.com/devnet/swf.html">SWF Technology Center | Adobe Developer Connection</a></li>
+              <li><a href="http://tools.ietf.org/rfc/rfc1950.txt">RFC1950 - ZLIB Compressed Data Format Specification version 3.3</a></li>
+              <li><a href="http://www.w3.org/TR/PNG/">Portable Network Graphics (PNG) Specification (Second Edition)</a></li>
+            </ul>
+          </li>
+          <li>解説
+            <ul>
+              <li><a href="http://labs.gree.jp/blog/2010/10/1263/">SWFバイナリ編集のススメ第四回 (GIF) | GREE Engineers&#039; Blog</a></li>
+              <li><a href="http://labs.gree.jp/blog/2010/12/1902/">SWFバイナリ編集のススメ第五回 (PNG) | GREE Engineers&#039; Blog</a></li>
+              <li><a href="http://labs.gree.jp/blog/2012/01/4082/">SWFバイナリ編集のススメ番外編 (zlib 伸張) 前編 | GREE Engineers&#039; Blog</a></li>
+              <li><a href="http://www.slideshare.net/7shi/zip-8136059">ZIP勉強会 - slideshare</a></li>
+            </ul>
+          </li>
+        </ul>
+      </article>
+
+    </section>
+
+  </body>
+</html>
