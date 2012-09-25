@@ -284,6 +284,9 @@ var plain = inflator.decompress();</pre></section>
           <li>
             Android 4.0 でも再現。Android Chrome や他のブラウザでは再現しない。
           </li>
+          <li>
+            <strong><strong>2012/09/26 00:30 追記:<br/> Android Browser では putImageData する際に RGB を premultiplied alpha だと思って処理をするので、premultiplied alpha に変換することで回避できました</strong></strong>
+          </li>
         </ul>
       </article>
 
