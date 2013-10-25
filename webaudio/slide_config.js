@@ -1,8 +1,8 @@
 var SLIDE_CONFIG = {
   // Slide settings
   settings: {
-    title: 'Web Audio API(仮)',
-    subtitle: 'smfplayer.js, sf2synth.js の実装概要',
+    title: 'Web Audio APIでMIDIファイル再生',
+    subtitle: 'smfplayer.js, sf2synth.js の概要',
     //eventInfo: {
     //  title: 'Google I/O',
     //  date: '6/x/2013'
@@ -12,7 +12,7 @@ var SLIDE_CONFIG = {
     enableSlideAreas: true, // Default: true. False turns off the click areas on either slide of the slides.
     enableTouch: true, // Default: true. If touch support should enabled. Note: the device must support touch.
     //analytics: 'UA-XXXXXXXX-1', // TODO: Using this breaks GA for some reason (probably requirejs). Update your tracking code in template.html instead.
-    favIcon: 'images/google_developers_logo_tiny.png',
+    favIcon: '',
     fonts: [
       'Open Sans:regular,semibold,italic,italicsemibold',
       'Source Code Pro'

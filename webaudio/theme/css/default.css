@@ -305,7 +305,9 @@ slides > slide:not(.nobackground):before {
   position: absolute;
   bottom: 20px;
   left: 60px;
+  /*
   background: url(../../images/google_developers_icon_128.png) no-repeat 0 50%;
+  */
   -webkit-background-size: 30px 30px;
   -moz-background-size: 30px 30px;
   -o-background-size: 30px 30px;
@@ -1328,7 +1330,7 @@ aside.gdbar img {
 }
 /* line 891, ../scss/default.scss */
 .title-slide hgroup h1 {
-  font-size: 65px;
+  font-size: 60px;
   line-height: 1.4;
   letter-spacing: -3px;
   color: #515151;
